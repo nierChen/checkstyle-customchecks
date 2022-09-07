@@ -91,13 +91,13 @@ public class ExceptionUniqueCodeCheck extends AbstractCheck {
         DetailAST codeAst = getBizExceptionCode(ast);
         if (codeAst != null) {
             if (fileErrCode == null) {
-                log(codeAst.getLineNo(), "File use errorCode but not managed in errorCode.yml!");
+                log(codeAst.getLineNo(), "This file is not managed by errorCode.yml!");
             } else {
                 String code = codeAst.getText().replace("\"", "");
                 if (!code.startsWith(fileErrCode)) {
-                    log(codeAst.getLineNo(), "ErrorCode " + codeAst.getText() + " does not conform to rules!");
+                    log(codeAst.getLineNo(), "Error code " + codeAst.getText() + " does not conform to the rules!");
                 } else if (codeSet.contains(code)) {
-                    log(codeAst.getLineNo(), "ErrorCode " + codeAst.getText() + " duplicate!");
+                    log(codeAst.getLineNo(), "Duplicate error code " + codeAst.getText());
                 } else {
                     codeSet.add(code);
                 }
