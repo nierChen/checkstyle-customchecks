@@ -1,0 +1,10 @@
+# module:
+#   full-package:
+#     class: error code prefix
+sub-module1:
+  com.example.sub1:
+    Test1: "0"
+
+sub-module2:
+  com.example.submodule2:
+    Test1: "0"
