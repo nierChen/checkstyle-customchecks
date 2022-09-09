@@ -1,87 +1,88 @@
-package com.dce.mt.checkstyle.customchecks;
-
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
-import com.puppycrawl.tools.checkstyle.api.DetailAST;
-import com.puppycrawl.tools.checkstyle.api.TokenTypes;
-import org.yaml.snakeyaml.Yaml;
+package com.dce.checkstyle.checks;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
-import java.util.regex.Matcher;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import com.dce.checkstyle.bean.errorcode.Clazz;
+import com.dce.checkstyle.bean.errorcode.ErrorCodeConfig;
+import com.dce.checkstyle.bean.errorcode.Module;
+import com.dce.checkstyle.bean.errorcode.Package;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
+import com.puppycrawl.tools.checkstyle.api.DetailAST;
+import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 public class ExceptionUniqueCodeCheck extends AbstractCheck {
 
     private static final String FILE_TYPE_JAVA = ".java";
+
     private static final String SRC_PATH = File.separator.concat("src").concat(File.separator).concat("main").concat(File.separator).concat("java");
 
-    private static final Set<String> codeSet = new HashSet<String>();
+    private static final Set<String> codeSet = new HashSet<>();
 
-    private Map<String, String> errorCodeMap = new HashMap<String, String>();
+    private Map<String, String> errorCodeMap = new HashMap<>();
 
     private File errorCodeFile;
 
-    private Set<String> exceptionFlag = new HashSet<>();
+    private Set<String> exceptions = new HashSet<>();
 
     public void setErrorCodeFile(File errorCodeFile) {
         this.errorCodeFile = errorCodeFile;
     }
 
-    public void setExceptionFlag(String[] exceptions) {
+    public void setExceptions(String[] exceptions) {
         for (String item : exceptions) {
-            this.exceptionFlag.add(item);
+            this.exceptions.add(item);
         }
     }
 
     @Override
     public int[] getDefaultTokens() {
-        return new int[]{TokenTypes.LITERAL_THROW};
+        return new int[] {TokenTypes.LITERAL_THROW};
     }
 
     @Override
     public int[] getAcceptableTokens() {
-        return new int[]{TokenTypes.LITERAL_THROW};
+        return new int[] {TokenTypes.LITERAL_THROW};
     }
 
     @Override
     public int[] getRequiredTokens() {
-        return new int[]{TokenTypes.LITERAL_THROW};
+        return new int[] {TokenTypes.LITERAL_THROW};
     }
 
     @Override
     public void init() {
         try {
             InputStream inputStream = new FileInputStream(errorCodeFile);
-            Yaml yaml = new Yaml();
-            Map fileMap = (Map) yaml.load(inputStream);
-            analyseMap(fileMap);
-        } catch (FileNotFoundException e) {
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            ErrorCodeConfig errors = mapper.readValue(inputStream, ErrorCodeConfig.class);
+            analyseMap(errors);
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void analyseMap(Map fileMap) {
-        if (fileMap != null) {
-            Set<String> modules = fileMap.keySet();
-            for (String module : modules) {
-                Map packageMap = (Map) fileMap.get(module);
-                if (packageMap != null) {
-                    Set<String> packages = packageMap.keySet();
-                    for (String packageKey : packages) {
-                        String packagePath = packageKey.replaceAll("\\.", Matcher.quoteReplacement(File.separator));
-                        Map<String, String> classMap = (Map<String, String>) packageMap.get(packageKey);
-                        if (classMap != null) {
-                            Set<String> classes = classMap.keySet();
-                            for (String classKey : classes) {
-                                errorCodeMap.put(packagePath.concat(File.separator)
-                                        .concat(classKey).concat(FILE_TYPE_JAVA), classMap.get(classKey));
-                            }
-                        }
+    private void analyseMap(ErrorCodeConfig errors) {
+        if (errors != null) {
+            String packagePath = null;
+            for (Module module: errors.getModules()) {
+                for (Package packagezz : module.getPackages()) {
+                    packagePath = packagezz.getName().replace(".", File.separator);
+                    for (Clazz clazz: packagezz.getClazzes()) {
+                        errorCodeMap.put(packagePath.concat(File.separator).concat(clazz.getName()).concat(FILE_TYPE_JAVA), clazz.getErrorCode());
                     }
                 }
             }
+        } else {
+            System.out.println("read error code file(yml) failed");
         }
     }
 
@@ -91,13 +92,13 @@ public class ExceptionUniqueCodeCheck extends AbstractCheck {
         DetailAST codeAst = getBizExceptionCode(ast);
         if (codeAst != null) {
             if (fileErrCode == null) {
-                log(codeAst.getLineNo(), "This file is not managed by errorCode.yml!");
+                log(codeAst.getLineNo(), "this class is not managed by errorCode.yml");
             } else {
                 String code = codeAst.getText().replace("\"", "");
                 if (!code.startsWith(fileErrCode)) {
-                    log(codeAst.getLineNo(), "Error code " + codeAst.getText() + " does not conform to the rules!");
+                    log(codeAst.getLineNo(), "Error code: " + codeAst.getText() + " breaks the rule in errorCode.yml");
                 } else if (codeSet.contains(code)) {
-                    log(codeAst.getLineNo(), "Duplicate error code " + codeAst.getText());
+                    log(codeAst.getLineNo(), "Duplicate error code: " + codeAst.getText());
                 } else {
                     codeSet.add(code);
                 }
@@ -124,7 +125,7 @@ public class ExceptionUniqueCodeCheck extends AbstractCheck {
                     DetailAST identAst = newAst.findFirstToken(TokenTypes.IDENT);
                     DetailAST elistAst = newAst.findFirstToken(TokenTypes.ELIST);
                     if (identAst != null && elistAst != null && identAst.getText() != null
-                            && exceptionFlag.contains(identAst.getText())) {
+                            && exceptions.contains(identAst.getText())) {
                         DetailAST codeAst = elistAst.getFirstChild().getFirstChild();
                         if (codeAst != null && codeAst.getText() != null) {
                             return codeAst;
