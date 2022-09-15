@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
+import com.puppycrawl.tools.checkstyle.api.FileContents;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 public class ExceptionUniqueCodeCheck extends AbstractCheck {
@@ -135,5 +136,10 @@ public class ExceptionUniqueCodeCheck extends AbstractCheck {
             }
         }
         return null;
+    }
+
+    private String getFilePath() {
+        FileContents fileContents = getFileContents();
+        return fileContents.getFileName();
     }
 }
